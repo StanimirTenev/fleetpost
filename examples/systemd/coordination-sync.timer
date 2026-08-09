@@ -1,0 +1,17 @@
+[Unit]
+Description=Agent coordination — hourly
+
+[Timer]
+# Change the minute to match TIMER_MINUTE in your config.env:
+OnCalendar=*:17
+# Persistent = catch up a run missed while the machine was off/asleep:
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
+# Install (user timer — runs as you, sees your rclone config):
+#   cp examples/systemd/coordination-sync.* ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now coordination-sync.timer
+#   loginctl enable-linger "$USER"   # so it runs even when you're not logged in

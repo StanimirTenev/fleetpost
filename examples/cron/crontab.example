@@ -1,0 +1,8 @@
+# Agent coordination — hourly at minute :17 (match TIMER_MINUTE in config.env).
+# Install with:  crontab -e   then paste the line below (fix the path).
+# cron has a minimal PATH; the script sets its own, but make sure rclone is on it.
+
+17 * * * * "$HOME/dev/agent-coordination-kit/scripts/sync.sh" >> "$HOME/.agent-coordination/sync.log" 2>&1
+
+# macOS note: cron works but is legacy. A launchd agent (with a StartCalendarInterval)
+# is the native choice and, like systemd's Persistent=true, will catch up a missed run.

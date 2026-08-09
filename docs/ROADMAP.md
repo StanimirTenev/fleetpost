@@ -1,0 +1,90 @@
+# Fleetpost — product plan & roadmap
+
+A grounded plan, written after market research. It does **not** pretend the category is
+empty (it isn't) — it aims Fleetpost at the gap the research actually found.
+
+## Positioning
+
+**One line:** *A mailbox for your machines — offline-tolerant, server-less agent
+coordination carried by any rclone remote.*
+
+**The honest wedge.** [SAMP](https://github.com/slima4/agent-message) (sync-daemon
+transport) and [GNAP](https://github.com/farol-team/gnap) (git transport) already do
+offline, server-less, cross-machine coordination. Fleetpost's defensible bundle is:
+rclone/object-storage transport **+** folder-native `inbox/handled` semantics **+**
+offline-published capability descriptor **+** hash-watched protocol changelog. Lead with
+that bundle and with the **async/offline** contrast to the real-time framing of
+[claude-code #28300](https://github.com/anthropics/claude-code/issues/28300).
+
+## Who it's for
+
+- Solo devs / small teams running AI coding agents on **2–5 machines** (laptop + desktop +
+  a build box, or a Mac for signing + a Linux CI box) who already use a cloud drive or
+  object storage.
+- People who want coordination **without standing up a server** and without a sync daemon
+  on every host.
+- Not for: single-machine multi-agent (use in-process frameworks) or teams needing
+  real-time, both-online collaboration (that's A2A / live session messaging).
+
+## Differentiation to defend (and to NOT overclaim)
+
+| Claim | Honest? |
+|---|---|
+| "Offline-tolerant, server-less, cross-machine" | True but **shared** with SAMP/GNAP — don't imply it's unique. |
+| "rclone / object-storage transport" | Genuinely distinct from SAMP (daemons) and GNAP (git). |
+| "Folder-native inbox/handled + offline capability discovery + protocol changelog" | The real bundle. Not found combined elsewhere. |
+
+## Roadmap
+
+**v0.1 — Kit (this release).** Parameterized `sync.sh` + `generate-inventory.sh`,
+templates, systemd/cron examples, README, protocol doc, MIT license. Verified end-to-end
+against a local rclone remote. *Goal: someone can wire up 2 machines in 15 minutes.*
+
+**v0.2 — Onboarding & safety.**
+- `fleetpost init` helper: interactive setup that writes `config.env`, seeds the shared
+  folder, creates the machine folder, installs the timer.
+- `fleetpost doctor`: checks rclone remote reachable, clock skew, folder layout.
+- `fleetpost handle <file>`: moves a request to `handled/` (the recurring manual step).
+- launchd example for macOS (native catch-up).
+
+**v0.3 — Ergonomics.**
+- A `send` helper to compose a well-formed request (enforces the required fields).
+- Optional read-model: a single `fleetpost status` showing fleet capabilities + pending
+  requests + last-seen times, from the pulled files.
+- Windows: PowerShell `sync.ps1` parity + Scheduled Task example.
+
+**v0.4 — Agent integration.**
+- A ready-made session-start hook (Claude Code / others) that runs `sync.sh` and surfaces
+  `SIGNAL.md` at the top of a session — closes the "flag → agent" gap so a freshly opened
+  session notices waiting work without being told.
+- Optional MCP wrapper so an agent can list fleet capabilities / drop a request as a tool
+  call (bridges to the live world without requiring a server for transport).
+
+**Later, maybe.** Encryption-at-rest note (rclone crypt remote), a tiny web view of the
+folder, multi-fleet namespacing.
+
+## Non-goals
+
+- No central server, no database, no daemon of our own — the moment we add one we become
+  mcp_agent_mail, not Fleetpost.
+- No real-time delivery guarantees. If you need both-online, use A2A or live session
+  messaging; Fleetpost is deliberately async.
+- No memory sync. Memory stays local, always.
+
+## Go-to-market (lightweight, adoption-first)
+
+1. **SEO/README:** capture Tier-A traffic ("Claude Code multiple machines", "coordinate
+   multiple agents") in the README intro; own a Tier-C phrase ("offline-tolerant agent
+   message bus over a shared folder"). GitHub topics: `ai-agents`, `multi-agent`,
+   `agent-coordination`, `claude-code`, `rclone`, `offline-first`, `message-bus`.
+2. **Honest launch note** on the claude-code #28300 thread and relevant discussions:
+   "async/offline take, complements the real-time asks." Link, don't spam.
+3. **A 60-second asciinema** of two machines exchanging a task with one powered off.
+4. **Cross-link SAMP** in the README (done) — being a good citizen in a small niche earns
+   more than pretending to be first.
+
+## Success signals
+
+Stars are vanity; the real signals are: someone files an issue describing a 3-machine
+setup we didn't anticipate; a PR adding a launchd/PowerShell variant; the term "rclone
+agent coordination" starts returning this repo.

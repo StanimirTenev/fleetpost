@@ -1,0 +1,11 @@
+[Unit]
+Description=Agent coordination — one sync cycle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust the path to where you cloned the kit:
+ExecStart=%h/dev/agent-coordination-kit/scripts/sync.sh
+# Exit 10 means "something new for you" — not a failure:
+SuccessExitStatus=10

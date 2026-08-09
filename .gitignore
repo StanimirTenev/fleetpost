@@ -1,0 +1,12 @@
+# Never commit real configuration or any live coordination data.
+config.env
+
+# Local working state (pulled inbox, hashes, staged descriptors) — machine-local,
+# never part of the repo.
+.agent-coordination/
+*.state
+*.hash
+
+# Editor / OS noise
+*.swp
+.DS_Store
