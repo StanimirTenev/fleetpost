@@ -64,11 +64,15 @@ if [ -n "$fresh" ] || [ "$proto_changed" -eq 1 ]; then
     echo
     echo "Detected: $(date '+%Y-%m-%d %H:%M'). This file is a flag, not a task — delete it once you act."
     echo
-    if [ -n "$fresh" ]; then
-      echo "## New requests in your inbox (\`$LOCAL_ROOT/inbox/\`)"
+    # List ALL unhandled top-level requests, not just the newly-detected ones —
+    # otherwise a rewrite triggered by something else (e.g. a protocol change)
+    # would drop a still-pending request from the flag. The file stays in the
+    # inbox; the flag must keep naming it until it's moved to handled/.
+    if [ -n "$new_state" ]; then
+      echo "## Pending requests in your inbox (\`$LOCAL_ROOT/inbox/\`)"
       while IFS=: read -r name size; do
         [ -n "$name" ] && echo "- \`$name\` ($size bytes)"
-      done <<< "$fresh"
+      done <<< "$new_state"
       echo
     fi
     if [ "$proto_changed" -eq 1 ]; then
