@@ -1,5 +1,12 @@
 # Fleetpost
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Made with Bash](https://img.shields.io/badge/made%20with-Bash-1f425f.svg)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)
+![Server: none](https://img.shields.io/badge/server-none-brightgreen.svg)
+![Transport: rclone](https://img.shields.io/badge/transport-rclone-orange.svg)
+![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
 **A mailbox for your machines.** Independent AI coding agents on separate computers
 drop tasks in a shared folder and pick them up whenever they wake — no server, no
 daemon, and no requirement that both sides be online at once.
@@ -47,6 +54,41 @@ four things — and nothing that touches another machine's data:
 4. **publishes** this machine's own descriptors, only when they actually changed
 
 It never *executes* a request. It fetches and flags; the agent does the work in a session.
+
+## Demo
+
+Your **desktop** needs something only the **laptop** can do, so it drops a request in the
+laptop's inbox and forgets about it:
+
+```console
+desktop$ echo "Compile the arm64 build and report the sha256." \
+           > 2026-08-09-from-desktop-compile.md
+desktop$ rclone copy 2026-08-09-from-desktop-compile.md \
+           "gdrive:coordination/laptop/inbox/"
+```
+
+The laptop is asleep. Hours later it wakes; its timer fires a sync:
+
+```console
+laptop$ ./scripts/sync.sh
+14:17  1/4 pulling laptop/inbox …
+14:17  2/4 detecting new requests and protocol changes …
+       -> new requests; raised SIGNAL.md
+14:17  3/4 pulling fleet capabilities …
+       -> desktop: fetched
+14:17  4/4 publishing my descriptors (only if changed) …
+14:17  done.
+# exit code 10 = "something new for you"
+
+laptop$ cat ~/.agent-coordination/SIGNAL.md
+# SIGNAL — something is waiting for you
+## New requests in your inbox (~/.agent-coordination/inbox/)
+- `2026-08-09-from-desktop-compile.md` (41 bytes)
+```
+
+The laptop's agent does the work, drops a reply in `desktop/inbox/`, and moves the
+request into `inbox/handled/`. The desktop picks up the answer on *its* next sync — and
+at no point did both machines need to be online at the same time.
 
 ## What makes it different
 
