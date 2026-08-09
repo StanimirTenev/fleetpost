@@ -48,16 +48,25 @@ new_state=$(cd "$LOCAL_ROOT/inbox" && find . -maxdepth 1 -type f ! -name '.keep*
 old_state=$(cat "$STATE/inbox.state" 2>/dev/null || true)
 fresh=$(comm -13 <(printf '%s\n' "$old_state") <(printf '%s\n' "$new_state") | sed '/^$/d' || true)
 
-# watch the shared changelog by hash
-proto_changed=0; ph=""
+# Watch the shared changelog by hash — but only ACKNOWLEDGE the hash once the flag has
+# been CLEARED, not at detection. Otherwise a rewrite triggered by a new request drops the
+# protocol notice from the flag and the acknowledged hash advances anyway, losing the
+# notice silently. protocol.ack = acknowledged hash; protocol.raised = shown but unacked.
+flag_absent_at_start=0; [ -f "$LOCAL_ROOT/SIGNAL.md" ] || flag_absent_at_start=1
+if [ "$flag_absent_at_start" -eq 1 ] && [ -f "$STATE/protocol.raised" ]; then
+  cp "$STATE/protocol.raised" "$STATE/protocol.ack"   # flag was cleared -> acknowledge what was shown
+  rm -f "$STATE/protocol.raised"
+fi
+
+proto_pending=0; ph=""
 if rclone copy "$REMOTE/PROTOCOL-CHANGES.md" "$LOCAL_ROOT/" 2>/dev/null; then
   ph=$(sha256sum "$LOCAL_ROOT/PROTOCOL-CHANGES.md" | cut -d' ' -f1)
-  oph=$(cat "$STATE/protocol.hash" 2>/dev/null || true)
-  [ "$ph" != "$oph" ] && proto_changed=1
+  ack=$(cat "$STATE/protocol.ack" 2>/dev/null || true)
+  [ "$ph" != "$ack" ] && proto_pending=1
 fi
 
 has_new=0
-if [ -n "$fresh" ] || [ "$proto_changed" -eq 1 ]; then
+if [ -n "$fresh" ] || [ "$proto_pending" -eq 1 ]; then
   has_new=1
   {
     echo "# SIGNAL — something is waiting for you"
@@ -75,13 +84,15 @@ if [ -n "$fresh" ] || [ "$proto_changed" -eq 1 ]; then
       done <<< "$new_state"
       echo
     fi
-    if [ "$proto_changed" -eq 1 ]; then
+    if [ "$proto_pending" -eq 1 ]; then
       echo "## ⚠ The protocol changed"
       echo "Read \`$LOCAL_ROOT/PROTOCOL-CHANGES.md\` — the working rules were updated."
     fi
   } > "$LOCAL_ROOT/SIGNAL.md"
+  # record which hash was SHOWN (unacknowledged); protocol.ack picks it up when the flag is cleared
+  [ "$proto_pending" -eq 1 ] && printf '%s\n' "$ph" > "$STATE/protocol.raised"
   msg=""; [ -n "$fresh" ] && msg="new requests"
-  [ "$proto_changed" -eq 1 ] && msg="${msg:+$msg + }protocol change"
+  [ "$proto_pending" -eq 1 ] && msg="${msg:+$msg + }protocol change"
   LOG "    -> $msg; raised SIGNAL.md"
   if command -v notify-send >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
     notify-send "Agent coordination" "$msg" 2>/dev/null || true
@@ -90,7 +101,6 @@ else
   LOG "    -> nothing new, protocol unchanged"
 fi
 printf '%s\n' "$new_state" > "$STATE/inbox.state"
-[ "$proto_changed" -eq 1 ] && printf '%s\n' "$ph" > "$STATE/protocol.hash"
 
 # ── 3. pull the fleet's capabilities ─────────────────────────────────────────
 LOG "3/4 pulling fleet capabilities …"
