@@ -36,15 +36,15 @@ that bundle and with the **async/offline** contrast to the real-time framing of
 
 ## Roadmap
 
-**v0.1 — Kit (this release).** Parameterized `sync.sh` + `generate-inventory.sh`,
-templates, systemd/cron examples, README, protocol doc, MIT license. Verified end-to-end
-against a local rclone remote. *Goal: someone can wire up 2 machines in 15 minutes.*
+**v0.1 — Kit (this release).** Parameterized `sync.sh` + `generate-inventory.sh` +
+`handle.sh` (mark a request handled), templates, systemd/cron examples, README, protocol
+doc, CONTRIBUTING, MIT license. Verified end-to-end against a local rclone remote.
+*Goal: someone can wire up 2 machines in 15 minutes.*
 
 **v0.2 — Onboarding & safety.**
 - `fleetpost init` helper: interactive setup that writes `config.env`, seeds the shared
   folder, creates the machine folder, installs the timer.
 - `fleetpost doctor`: checks rclone remote reachable, clock skew, folder layout.
-- `fleetpost handle <file>`: moves a request to `handled/` (the recurring manual step).
 - launchd example for macOS (native catch-up).
 
 **v0.3 — Ergonomics.**
