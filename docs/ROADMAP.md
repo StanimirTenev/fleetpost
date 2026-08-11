@@ -42,16 +42,21 @@ doc, CONTRIBUTING, MIT license. Verified end-to-end against a local rclone remot
 *Goal: someone can wire up 2 machines in 15 minutes.*
 
 **v0.2 — Onboarding & safety.**
-- `fleetpost init` helper: interactive setup that writes `config.env`, seeds the shared
-  folder, creates the machine folder, installs the timer.
-- `fleetpost doctor`: checks rclone remote reachable, clock skew, folder layout.
-- launchd example for macOS (native catch-up).
+- **`scripts/init.sh` — shipped.** Interactive (or flag-driven) setup: writes `config.env`,
+  creates the local working directory, stages a capabilities descriptor, claims this
+  machine's folder on the remote. Refuses to overwrite an existing config without `--force`,
+  and installs no scheduler — it prints the command instead, so nothing lands unasked.
+- **`scripts/doctor.sh` — shipped.** Checks config completeness, rclone presence, remote
+  reachability, folder layout, a staged descriptor, and a clock behind the remote.
+- Still open: launchd example for macOS (native catch-up).
 
 **v0.3 — Ergonomics.**
-- A `send` helper to compose a well-formed request (enforces the required fields).
-- Optional read-model: a single `fleetpost status` showing fleet capabilities + pending
-  requests + last-seen times, from the pulled files.
-- Windows: PowerShell `sync.ps1` parity + Scheduled Task example.
+- **`scripts/send.sh` — shipped.** Composes a well-formed request and drops it in another
+  machine's inbox; every protocol-required field is mandatory. Byte-identical to what the
+  MCP server writes (`mcp/tests/test_parity.py` asserts it).
+- **`scripts/status.sh` — shipped.** Pending requests, protocol changes, fleet capabilities
+  and last-seen times, read from the pulled files. No network. Exit `10` = something waits.
+- Still open: Windows PowerShell `sync.ps1` parity + Scheduled Task example.
 
 **v0.4 — Agent integration.**
 - **MCP server — shipped.** `mcp/` (`fleetpost-mcp` on PyPI): `fleet_status`,
@@ -60,9 +65,10 @@ doc, CONTRIBUTING, MIT license. Verified end-to-end against a local rclone remot
   implementation of the protocol, and no server of its own.
   *Note:* this brings v0.3's `send` and `status` in early, as tools rather than as shell
   helpers. The shell equivalents are still worth having for people not driving an agent.
-- Still open: a ready-made session-start hook (Claude Code / others) that runs `sync.sh` and
-  surfaces `SIGNAL.md` at the top of a session — closes the "flag → agent" gap so a freshly
-  opened session notices waiting work without being told.
+- **Session-start hook — shipped.** `examples/hooks/session-start.sh` surfaces whatever the
+  last cycle flagged at the top of an agent session, and is silent when nothing waits —
+  closing the "flag → agent" gap. Local-only by default; `FLEETPOST_HOOK_SYNC=1` pulls first,
+  for a machine with no scheduler. Cannot break a session: every path exits 0.
 
 **Later, maybe.** Encryption-at-rest note (rclone crypt remote), a tiny web view of the
 folder, multi-fleet namespacing.

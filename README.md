@@ -124,21 +124,14 @@ the protocol, and still no server. See [mcp/README.md](mcp/README.md).
 ```bash
 git clone https://github.com/StanimirTenev/fleetpost
 cd fleetpost
-cp config.example.env config.env
-$EDITOR config.env            # set RCLONE_REMOTE, COORD_DIR, MACHINE_NAME, FLEET
+./scripts/init.sh             # asks four questions, writes config.env, claims your folder
+$EDITOR ~/.agent-coordination/self/capabilities.md   # what this machine can do — the fleet reads it
+./scripts/doctor.sh           # confirm the wiring before wondering why nothing arrives
+./scripts/sync.sh             # first cycle: publish yourself, fetch the others
 
-# one-time: seed the shared folder (run once, from any machine)
-rclone mkdir "<remote>:<coord-dir>"
+# one-time for the whole fleet: seed the shared docs (from any one machine)
 rclone copy templates/00-START-HERE.md      "<remote>:<coord-dir>/"
 rclone copy templates/PROTOCOL-CHANGES.md   "<remote>:<coord-dir>/"
-
-# publish yourself, then run a cycle
-# (~/.agent-coordination is the default LOCAL_ROOT; change both if you edited it.)
-# sync.sh creates your <machine>/inbox on the remote automatically on first run.
-mkdir -p ~/.agent-coordination/self
-cp templates/capabilities.template.md ~/.agent-coordination/self/capabilities.md
-$EDITOR ~/.agent-coordination/self/capabilities.md
-./scripts/sync.sh
 
 # schedule it (Linux, user timer)
 cp examples/systemd/coordination-sync.* ~/.config/systemd/user/
@@ -146,6 +139,31 @@ systemctl --user daemon-reload
 systemctl --user enable --now coordination-sync.timer
 loginctl enable-linger "$USER"
 ```
+
+Prefer to wire it by hand? `cp config.example.env config.env` and edit — `init.sh` writes
+exactly that file and nothing else.
+
+## Day to day
+
+```bash
+./scripts/status.sh    # what's waiting for me, what the fleet can do (local, no network)
+./scripts/send.sh --to desktop --topic "sign the installer" \
+                  --want "Sign dist/app.exe with the company cert." \
+                  --done "signtool verify /pa passes on the uploaded file." \
+                  --until 2026-09-01
+./scripts/handle.sh <filename>   # done with one: move it to inbox/handled/
+```
+
+`send.sh` requires every field the protocol asks for, so a request that cannot be acted on
+cannot be created.
+
+### Notice requests without being told
+
+An established agent never re-reads the onboarding doc, so a request can sit unnoticed.
+[`examples/hooks/session-start.sh`](examples/hooks/session-start.sh) prints whatever the last
+cycle flagged at the top of an agent session, and stays completely silent when nothing is
+waiting. It reads local files only — set `FLEETPOST_HOOK_SYNC=1` to pull first, which is the
+right choice on a machine with no scheduler.
 
 See [`docs/PROTOCOL.md`](docs/PROTOCOL.md) for the full protocol and [`00-START-HERE.md`](templates/00-START-HERE.md)
 for what a new agent reads.
