@@ -54,11 +54,15 @@ doc, CONTRIBUTING, MIT license. Verified end-to-end against a local rclone remot
 - Windows: PowerShell `sync.ps1` parity + Scheduled Task example.
 
 **v0.4 — Agent integration.**
-- A ready-made session-start hook (Claude Code / others) that runs `sync.sh` and surfaces
-  `SIGNAL.md` at the top of a session — closes the "flag → agent" gap so a freshly opened
-  session notices waiting work without being told.
-- Optional MCP wrapper so an agent can list fleet capabilities / drop a request as a tool
-  call (bridges to the live world without requiring a server for transport).
+- **MCP server — shipped.** `mcp/` (`fleetpost-mcp` on PyPI): `fleet_status`,
+  `fleet_capabilities`, `fleet_read_request`, `fleet_send_request`, `fleet_handle`,
+  `fleet_sync`. It reads the same `config.env` and calls the same scripts — no second
+  implementation of the protocol, and no server of its own.
+  *Note:* this brings v0.3's `send` and `status` in early, as tools rather than as shell
+  helpers. The shell equivalents are still worth having for people not driving an agent.
+- Still open: a ready-made session-start hook (Claude Code / others) that runs `sync.sh` and
+  surfaces `SIGNAL.md` at the top of a session — closes the "flag → agent" gap so a freshly
+  opened session notices waiting work without being told.
 
 **Later, maybe.** Encryption-at-rest note (rclone crypt remote), a tiny web view of the
 folder, multi-fleet namespacing.

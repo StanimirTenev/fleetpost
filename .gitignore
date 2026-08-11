@@ -10,3 +10,10 @@ config.env
 # Editor / OS noise
 *.swp
 .DS_Store
+
+# MCP subpackage build artifacts
+mcp/.venv/
+mcp/dist/
+mcp/**/__pycache__/
+mcp/.pytest_cache/
+mcp/*.egg-info/

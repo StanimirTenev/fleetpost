@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.StanimirTenev/fleetpost-mcp",
+  "title": "Fleetpost",
+  "description": "A mailbox for your machines: read fleet capabilities, send a request. Offline, no server.",
+  "repository": {
+    "url": "https://github.com/StanimirTenev/fleetpost",
+    "source": "github",
+    "subfolder": "mcp"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "fleetpost-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "FLEETPOST_CONFIG",
+          "description": "Path to your Fleetpost config.env. Optional if you start the server from the checkout that contains it.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "FLEETPOST_HOME",
+          "description": "Path to the Fleetpost checkout, if config.env was copied away from it. Needed by fleet_sync and fleet_handle.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

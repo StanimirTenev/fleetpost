@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fleetpost-mcp"
+version = "0.1.0"
+description = "MCP server for Fleetpost — offline-tolerant, server-less agent coordination over any rclone remote"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Stanimir Tenev" }]
+keywords = [
+    "mcp", "model-context-protocol", "ai-agents", "multi-agent", "agent-coordination",
+    "claude-code", "rclone", "offline-first", "message-bus",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+]
+# mcp 2.0 moved the server class to mcp.server.mcpserver; 1.x resolves to a missing module.
+dependencies = ["mcp>=2.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/StanimirTenev/fleetpost"
+Repository = "https://github.com/StanimirTenev/fleetpost"
+
+[project.scripts]
+fleetpost-mcp = "fleetpost_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fleetpost_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]

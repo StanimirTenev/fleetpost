@@ -104,6 +104,21 @@ The category is not empty — see [Alternatives](#alternatives). Fleetpost's spe
 - **Hash-watched changelog** — rule changes reach already-running agents, which would
   otherwise never re-read the onboarding doc.
 
+## Use it from an agent (MCP)
+
+There is an MCP server in [`mcp/`](mcp/) — `fleetpost-mcp` on PyPI — so an agent can read
+the fleet's capabilities, work through its own inbox, and hand a task to another machine as
+tool calls:
+
+```json
+{ "mcpServers": { "fleetpost": {
+    "command": "uvx", "args": ["fleetpost-mcp"],
+    "env": { "FLEETPOST_CONFIG": "/path/to/fleetpost/config.env" } } } }
+```
+
+It reads this same `config.env` and runs these same scripts — no second implementation of
+the protocol, and still no server. See [mcp/README.md](mcp/README.md).
+
 ## Quickstart
 
 ```bash
