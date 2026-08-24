@@ -16,7 +16,10 @@ mcp = MCPServer("fleetpost", version=__version__)
 def fleet_status() -> dict[str, Any]:
     """What is waiting for this machine: unhandled requests in its inbox, whether the
     shared protocol changed, which other machines' capabilities are known, and when the
-    last coordination cycle ran. Reads local files only."""
+    last coordination cycle ran. Also what this machine is waiting on: requests it sent
+    that the recipient has not picked up yet (`outstanding_sends`), each with when that
+    recipient last ran a cycle — null there means it never has, so it will not see the
+    request at all. Reads local files only."""
     return fleet.status(load())
 
 

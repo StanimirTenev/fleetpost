@@ -70,6 +70,39 @@ def _protocol_change_pending(cfg: Config) -> bool:
     return current != ack
 
 
+def _heartbeat(cfg: Config, machine: str) -> str | None:
+    """When that machine last ran a cycle, as it published it. None = never ran one."""
+    path = cfg.local_root / "fleet" / machine / "last-sync.txt"
+    return path.read_text(encoding="utf-8").strip() if path.is_file() else None
+
+
+def _outstanding(cfg: Config) -> list[dict[str, Any]]:
+    """Requests this machine sent that are still at the top level of the recipient's inbox.
+
+    Derived by the last sync, not by looking at the remote now, so this stays offline.
+    `state` is "pending" (seen unhandled) or "unknown" (that inbox was unreadable then).
+    """
+    path = cfg.local_root / "state" / "outstanding.tsv"
+    if not path.is_file():
+        return []
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue
+        to, name, sent_on, state = parts[:4]
+        rows.append({
+            "to": to,
+            "name": name,
+            "sent_on": sent_on,
+            "state": state,
+            "recipient_last_cycle": _heartbeat(cfg, to),
+        })
+    return rows
+
+
 def status(cfg: Config) -> dict[str, Any]:
     signal = cfg.local_root / "SIGNAL.md"
     known = []
@@ -79,6 +112,7 @@ def status(cfg: Config) -> dict[str, Any]:
             "machine": machine,
             "capabilities_known": descriptor.is_file(),
             "last_updated": _mtime(descriptor),
+            "last_cycle": _heartbeat(cfg, machine),
         })
 
     return {
@@ -86,6 +120,7 @@ def status(cfg: Config) -> dict[str, Any]:
         "config": str(cfg.path),
         "signal_raised": signal.is_file(),
         "pending_requests": _pending(cfg),
+        "outstanding_sends": _outstanding(cfg),
         "protocol_change_pending": _protocol_change_pending(cfg),
         "fleet": known,
         "last_sync": _mtime(cfg.local_root / "state" / "inbox.state"),
@@ -167,6 +202,13 @@ def send_request(
     )
     if result.returncode != 0:
         raise FleetError(f"rclone could not write the request: {result.stderr.decode().strip()}")
+
+    # Same record send.sh keeps: the only ack on a folder bus is the recipient moving the
+    # file into its handled/, and that is only meaningful against a list of what was sent.
+    log = cfg.local_root / "state" / "sent.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with log.open("a", encoding="utf-8") as fh:
+        fh.write(f"{today}\t{to}\t{filename}\n")
 
     return {"sent_to": to, "filename": filename, "remote_path": target, "body": body}
 

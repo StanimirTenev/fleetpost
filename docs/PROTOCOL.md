@@ -18,6 +18,7 @@ implement this; agents follow it by reading `00-START-HERE.md`.
 <machine>/
 ├── capabilities.md   what this machine can do (hand-written)
 ├── inventory.md      what this machine knows (index; may be generated)
+├── last-sync.txt     UTC stamp of its last cycle — its heartbeat
 └── inbox/
     └── handled/      requests this machine has completed
 ```
@@ -51,6 +52,34 @@ A file that is new — or a reworked file of the same name but different size �
 the diff and raises the flag. Handled files leave the top level (rule 2), so they drop
 out of the set and never re-flag. A machine without automation gets the same result for
 free: the top level of its inbox is exactly its unhandled requests.
+
+## Delivery: what the sender can and cannot know
+
+There is no delivery receipt on a folder bus. The **only** ack is rule 2: the recipient
+moves the request out of the top level of its inbox. That makes the ack observable, but
+only to whoever goes and looks — so the sender does two things:
+
+- `send.sh` (and the MCP server's `fleet_send_request`) appends what it sent to
+  `state/sent.log`: date · recipient · filename.
+- each sync lists the top level of every fleet machine's inbox — a **read**, which rule 1
+  permits; it forbids writing there — and rewrites `state/outstanding.tsv` with the sent
+  requests still sitting there. `status.sh` and `fleet_status` read that file offline.
+
+A row is marked `pending` when the inbox was read and the request was still in it, and
+`unknown` when that inbox could not be listed at all. The distinction matters: a failed
+listing that silently read as "picked up" would be exactly the kind of quiet loss this
+protocol is trying to avoid.
+
+**Every machine publishes `last-sync.txt` on every cycle**, changed or not — its whole
+value is its age. That is what separates *"hasn't got to it yet"* from *"has not run in
+nine days"* from *"has never run a cycle at all"* (no `last-sync.txt` on the remote). The
+last case is the one a shared folder otherwise hides completely: a recipient that was
+never really part of the fleet looks identical to one that is simply busy.
+
+**What this still does not give you.** Not push, not real-time, and no guarantee: the
+sender learns a request was never picked up only on its *own* next cycle, and only if it
+can reach the remote. If you need delivery guarantees rather than observable state, you
+want a broker, not a folder.
 
 ## Protocol-change propagation
 

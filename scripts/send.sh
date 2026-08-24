@@ -28,6 +28,7 @@ CONFIG="${CONFIG:-$HERE/config.env}"
 # shellcheck disable=SC1090
 . "$CONFIG"
 : "${RCLONE_REMOTE:?set RCLONE_REMOTE}"; : "${COORD_DIR:?set COORD_DIR}"; : "${MACHINE_NAME:?set MACHINE_NAME}"
+: "${LOCAL_ROOT:?set LOCAL_ROOT}"   # the send is recorded here, so status.sh can follow it up
 
 TO=""; TOPIC=""; WANT=""; DONE=""; UNTIL=""; REPLY_TO=""
 usage() {
@@ -73,4 +74,12 @@ BODY=$(printf '# %s\n\n**From:** %s  \n**Date:** %s  \n**Valid until:** %s\n\n##
   "$TOPIC" "$MACHINE_NAME" "$TODAY" "$UNTIL" "$WANT" "$DONE" "$ANSWER_TO")
 
 printf '%s\n' "$BODY" | rclone rcat "$TARGET" || { echo "ERROR: could not write the request" >&2; exit 1; }
+
+# Record the send locally. Nothing reports back on a folder bus: the only ack is the
+# recipient moving the file into its own inbox/handled/. Without this line the sender
+# has no record to compare that against, and a request that was never picked up looks
+# exactly like one that was.
+mkdir -p "$LOCAL_ROOT/state"
+printf '%s\t%s\t%s\n' "$TODAY" "$TO" "$FILENAME" >> "$LOCAL_ROOT/state/sent.log"
+
 echo "Sent to ${TO}: ${FILENAME}"

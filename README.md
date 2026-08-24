@@ -39,6 +39,7 @@ walk away; the powered-off machine catches up on its own.
 ├── laptop/
 │   ├── capabilities.md              what this machine can do (hand-written)
 │   ├── inventory.md                 what it knows (index; optional generator)
+│   ├── last-sync.txt                when it last ran a cycle (its heartbeat)
 │   └── inbox/
 │       └── handled/                 requests it has completed
 ├── desktop/
@@ -50,8 +51,9 @@ four things — and nothing that touches another machine's data:
 
 1. **pulls** this machine's `inbox/`
 2. **detects** new requests (and protocol changes) → raises a local `SIGNAL.md` flag
-3. **pulls** every other machine's `capabilities.md` so this one knows who to ask
-4. **publishes** this machine's own descriptors, only when they actually changed
+3. **pulls** every other machine's `capabilities.md` and `last-sync.txt`, and **looks**
+   at their inboxes to see which of *this* machine's own requests are still unhandled
+4. **publishes** this machine's own descriptors (only when changed) and its heartbeat
 
 It never *executes* a request. It fetches and flags; the agent does the work in a session.
 
@@ -146,7 +148,8 @@ exactly that file and nothing else.
 ## Day to day
 
 ```bash
-./scripts/status.sh    # what's waiting for me, what the fleet can do (local, no network)
+./scripts/status.sh    # what's waiting for me, what I'm still waiting on, what the fleet
+                       # can do (local, no network)
 ./scripts/send.sh --to desktop --topic "sign the installer" \
                   --want "Sign dist/app.exe with the company cert." \
                   --done "signtool verify /pa passes on the uploaded file." \

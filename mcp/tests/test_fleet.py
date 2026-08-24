@@ -156,3 +156,74 @@ def test_capabilities_are_readable_after_a_cycle(tmp_path):
 
     with pytest.raises(fleet.FleetError, match="unknown machine"):
         fleet.capabilities(laptop, "mars")
+
+
+@needs_fleet
+def test_the_sender_sees_a_request_that_was_never_picked_up(tmp_path):
+    """The gap this closes: on a folder bus nothing reports back, so an unhandled request
+    and a handled one look identical to the sender unless the sync goes and looks."""
+    for machine in ("laptop", "desktop"):
+        (tmp_path / "remote" / "coord" / machine / "inbox").mkdir(parents=True)
+        (tmp_path / f"{machine}-root" / "self").mkdir(parents=True)
+        (tmp_path / f"{machine}-root" / "self" / "capabilities.md").write_text(
+            f"{machine} can do {machine} things\n", encoding="utf-8")
+
+    laptop_cfg_path = _write_config(tmp_path, "laptop", "desktop")
+    desktop_cfg_path = _write_config(tmp_path, "desktop", "laptop")
+    laptop = _cfg(tmp_path, "laptop", ("desktop",))
+    desktop = _cfg(tmp_path, "desktop", ("laptop",))
+    object.__setattr__(laptop, "path", laptop_cfg_path)
+    object.__setattr__(desktop, "path", desktop_cfg_path)
+
+    _sync(laptop_cfg_path)
+    # desktop has not run a cycle yet: no heartbeat, and the laptop can say so.
+    assert fleet.status(laptop)["fleet"][0]["last_cycle"] is None
+
+    sent = fleet.send_request(
+        laptop, "desktop", "sign the installer",
+        what_is_wanted="sign dist/app.exe", done_means="signtool verify passes",
+        valid_until="2026-09-01",
+    )
+
+    _sync(laptop_cfg_path)
+    outstanding = fleet.status(laptop)["outstanding_sends"]
+    assert [(r["name"], r["to"], r["state"]) for r in outstanding] == [
+        (sent["filename"], "desktop", "pending")]
+    # and it is distinguishable from "hasn't got to it yet": desktop has never synced.
+    assert outstanding[0]["recipient_last_cycle"] is None
+
+    # desktop wakes up, runs a cycle, and picks the request up
+    _sync(desktop_cfg_path)
+    fleet.handle_request(desktop, sent["filename"])
+
+    _sync(laptop_cfg_path)
+    laptop_status = fleet.status(laptop)
+    assert laptop_status["outstanding_sends"] == []
+    assert laptop_status["fleet"][0]["last_cycle"] is not None
+
+
+@needs_fleet
+def test_an_unreadable_inbox_is_reported_as_unknown_not_as_picked_up(tmp_path):
+    """A failed listing must never read as an ack — that is the silent-loss class of bug."""
+    for machine in ("laptop", "desktop"):
+        (tmp_path / "remote" / "coord" / machine / "inbox").mkdir(parents=True)
+        (tmp_path / f"{machine}-root" / "self").mkdir(parents=True)
+        (tmp_path / f"{machine}-root" / "self" / "capabilities.md").write_text(
+            f"{machine}\n", encoding="utf-8")
+
+    laptop_cfg_path = _write_config(tmp_path, "laptop", "desktop")
+    laptop = _cfg(tmp_path, "laptop", ("desktop",))
+    object.__setattr__(laptop, "path", laptop_cfg_path)
+
+    sent = fleet.send_request(
+        laptop, "desktop", "sign it", what_is_wanted="w", done_means="d",
+        valid_until="2026-09-01",
+    )
+    _sync(laptop_cfg_path)
+    assert fleet.status(laptop)["outstanding_sends"][0]["state"] == "pending"
+
+    # the recipient's inbox becomes unreachable (folder gone, remote down — same effect)
+    shutil.rmtree(tmp_path / "remote" / "coord" / "desktop")
+    _sync(laptop_cfg_path)
+    still = fleet.status(laptop)["outstanding_sends"]
+    assert [(r["name"], r["state"]) for r in still] == [(sent["filename"], "unknown")]

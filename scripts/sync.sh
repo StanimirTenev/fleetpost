@@ -3,8 +3,9 @@
 # It does exactly four things and NOTHING that changes another machine's data:
 #   1. pull THIS machine's inbox from the shared folder
 #   2. detect new requests + protocol changes -> raise a local SIGNAL.md flag
-#   3. pull the capabilities descriptor of every other machine in the fleet
-#   4. publish THIS machine's descriptors, but only when they actually changed
+#   3. pull every other machine's descriptor and heartbeat, and check which of the
+#      requests THIS machine sent are still sitting unhandled in their inboxes
+#   4. publish THIS machine's descriptors (only when changed) and its heartbeat (always)
 #
 # It NEVER executes a request. It only fetches and flags; a human/agent session
 # does the work later. Anti-collision rule: read only your own inbox, write only
@@ -102,20 +103,54 @@ else
 fi
 printf '%s\n' "$new_state" > "$STATE/inbox.state"
 
-# ── 3. pull the fleet's capabilities ─────────────────────────────────────────
-LOG "3/4 pulling fleet capabilities …"
+# ── 3. pull the fleet's descriptors, and follow up on what I sent ────────────
+# Reading another machine's folder is allowed; the anti-collision rule forbids WRITING
+# outside your own area and outside others' inboxes. Listing is how the sender learns
+# anything at all: a folder bus has no delivery receipt, so the only ack is the
+# recipient moving the request into its own inbox/handled/, and the only way to see
+# that is to look at what is still at the top level.
+LOG "3/4 pulling fleet descriptors and checking on my sent requests …"
+old_outstanding=$(cat "$STATE/outstanding.tsv" 2>/dev/null || true)
+: > "$STATE/outstanding.tmp"
 for m in ${FLEET:-}; do
-  if rclone lsf "$REMOTE/$m/" 2>/dev/null | grep -qx 'capabilities.md'; then
+  listing=$(rclone lsf "$REMOTE/$m/" 2>/dev/null || true)
+
+  if printf '%s\n' "$listing" | grep -qx 'capabilities.md'; then
     rclone copy "$REMOTE/$m/capabilities.md" "$LOCAL_ROOT/fleet/$m" 2>/dev/null \
       || fail "cannot pull $m/capabilities.md"
-    LOG "    -> $m: fetched"
+    LOG "    -> $m: capabilities fetched"
   else
     LOG "    -> $m: no capabilities.md yet (skipping — normal)"
   fi
+
+  # Heartbeat. A machine that has never run a cycle publishes no last-sync.txt at all —
+  # that is the "the recipient was never subscribed" case, and it is what separates
+  # "hasn't got to it yet" from "will never see it".
+  if printf '%s\n' "$listing" | grep -qx 'last-sync.txt'; then
+    rclone copy "$REMOTE/$m/last-sync.txt" "$LOCAL_ROOT/fleet/$m" 2>/dev/null || true
+  fi
+
+  if inbox_listing=$(rclone lsf "$REMOTE/$m/inbox/" --files-only 2>/dev/null); then
+    while IFS=$'\t' read -r sent_on to name; do
+      [ "$to" = "$m" ] && [ -n "$name" ] || continue
+      printf '%s\n' "$inbox_listing" | grep -qxF "$name" \
+        && printf '%s\t%s\t%s\tpending\n' "$m" "$name" "$sent_on" >> "$STATE/outstanding.tmp"
+    done < <(sort -u "$STATE/sent.log" 2>/dev/null || true)
+  else
+    # Could not look this cycle. Carry the previous answer over marked unknown rather
+    # than let a failed listing read as "everything was picked up".
+    printf '%s\n' "$old_outstanding" \
+      | awk -F'\t' -v m="$m" 'NF && $1==m { print $1"\t"$2"\t"$3"\tunknown" }' \
+      >> "$STATE/outstanding.tmp" || true
+    LOG "    -> $m: inbox not readable this cycle (my sent requests: state unknown)"
+  fi
 done
+mv "$STATE/outstanding.tmp" "$STATE/outstanding.tsv"
+waiting_on=$(grep -c . "$STATE/outstanding.tsv" 2>/dev/null || true)
+[ "${waiting_on:-0}" -gt 0 ] && LOG "    -> $waiting_on request(s) I sent are still unhandled"
 
 # ── 4. publish my descriptors, only when changed ─────────────────────────────
-LOG "4/4 publishing my descriptors (only if changed) …"
+LOG "4/4 publishing my descriptors (only if changed) and my heartbeat …"
 # inventory.md: generated from MEMORY_DIR if set, else a hand-written file staged in self/
 if [ -n "${MEMORY_DIR:-}" ]; then
   "$HERE/scripts/generate-inventory.sh" "$LOCAL_ROOT/self/inventory.md" \
@@ -137,6 +172,12 @@ publish_if_changed() {  # $1 = local file, $2 = hash-state file
 }
 publish_if_changed "$LOCAL_ROOT/self/inventory.md"    "$STATE/inventory.hash"
 publish_if_changed "$LOCAL_ROOT/self/capabilities.md" "$STATE/capabilities.hash"
+
+# The heartbeat goes up on EVERY cycle, changed or not — its whole value is its age.
+date -u '+%Y-%m-%dT%H:%M:%SZ' > "$LOCAL_ROOT/self/last-sync.txt"
+rclone copy "$LOCAL_ROOT/self/last-sync.txt" "$REMOTE/$MACHINE_NAME/" 2>/dev/null \
+  || fail "cannot publish last-sync.txt"
+LOG "    -> last-sync.txt: published"
 
 LOG "done."
 [ "$has_new" -eq 1 ] && exit 10
