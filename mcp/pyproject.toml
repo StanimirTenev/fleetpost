@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fleetpost-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for Fleetpost — offline-tolerant, server-less agent coordination over any rclone remote"
 readme = "README.md"
 requires-python = ">=3.10"
